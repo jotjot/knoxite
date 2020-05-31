@@ -1,6 +1,7 @@
 /*
  * knoxite
  *     Copyright (c) 2016-2020, Christian Muehlhaeuser <muesli@gmail.com>
+ *     Copyright (c) 2020,      Nicolas Martin <penguwin@penguwin.eu>
  *
  *   For license see LICENSE
  */
@@ -19,7 +20,6 @@ import (
 	"github.com/knoxite/knoxite/utils"
 )
 
-// Error declarations
 var (
 	repoCmd = &cobra.Command{
 		Use:   "repo",
