@@ -52,10 +52,31 @@ var (
 			if len(args) < 2 {
 				return fmt.Errorf("store needs to know which files and/or directories to work on")
 			}
+			storeOpts = configureStoreOpts(cmd, storeOpts)
+
 			return executeStore(args[0], args[1:], storeOpts)
 		},
 	}
 )
+
+// configureStoreOpts will compare the the setting from the configration file and
+// the user set command line flags.
+// When there exists a config for the repo we'll use the values from
+// there unless the user sets another value via the command line flags.
+func configureStoreOpts(cmd *cobra.Command, opts StoreOptions) StoreOptions {
+	if rep, ok := config.Repositories[globalOpts.Repo]; ok {
+		if !cmd.Flags().Changed("compression") {
+			opts.Compression = rep.Compression
+		}
+		if !cmd.Flags().Changed("encryption") {
+			opts.Encryption = rep.Encryption
+		}
+		if !cmd.Flags().Changed("tolerance") {
+			opts.FailureTolerance = rep.Tolerance
+		}
+	}
+	return opts
+}
 
 func initStoreFlags(f func() *pflag.FlagSet) {
 	f().StringVarP(&storeOpts.Description, "desc", "d", "", "a description or comment for this volume")
@@ -79,7 +100,7 @@ func store(repository *knoxite.Repository, chunkIndex *knoxite.ChunkIndex, snaps
 		return gerr
 	}
 
-	if uint(len(repository.BackendManager().Backends))-opts.FailureTolerance <= 0 {
+	if len(repository.BackendManager().Backends)-int(opts.FailureTolerance) <= 0 {
 		return ErrRedundancyAmount
 	}
 	compression, err := utils.CompressionTypeFromString(opts.Compression)
@@ -91,10 +112,17 @@ func store(repository *knoxite.Repository, chunkIndex *knoxite.ChunkIndex, snaps
 		return err
 	}
 
+	var tol uint
+	if inttol := len(repository.BackendManager().Backends) - int(opts.FailureTolerance); inttol <= 0 {
+		tol = 0
+	} else {
+		tol = uint(inttol)
+	}
+
 	startTime := time.Now()
 	progress := snapshot.Add(wd, targets, opts.Excludes, *repository, chunkIndex,
 		compression, encryption,
-		uint(len(repository.BackendManager().Backends))-opts.FailureTolerance, opts.FailureTolerance)
+		tol, opts.FailureTolerance)
 
 	fileProgressBar := &goprogressbar.ProgressBar{Width: 40}
 	overallProgressBar := &goprogressbar.ProgressBar{
